@@ -237,6 +237,13 @@ function buildCard(entry, idx) {
           </svg>
           Docs
         </a>` : ''}
+        <button class="btn-copy" id="copy-${idx}" onclick="copyToClipboard('${escapeAttr(entry.id)}', ${idx})" aria-label="Copy release note to clipboard">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+            <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+          </svg>
+          Copy
+        </button>
         <button class="btn-tweet" onclick="openTweetModal(${idx})" aria-label="Tweet about ${escapeAttr(entry.title)}">
           <svg width="13" height="13" viewBox="0 0 1200 1227" fill="none">
             <path d="M714.163 519.284L1160.89 0H1055.03L667.137 450.887L357.328 0H0L468.492 681.821L0 1226.37H105.866L515.491 750.218L842.672 1226.37H1200L714.163 519.284ZM569.165 687.828L521.697 619.934L144.011 79.6944H306.615L611.412 515.685L658.88 583.579L1055.08 1150.3H892.476L569.165 687.828Z" fill="currentColor"/>
@@ -351,8 +358,94 @@ function openTweetModal(idx) {
 }
 
 /* =============================================
-   TOAST
+   COPY TO CLIPBOARD
    ============================================= */
+function copyToClipboard(entryId, idx) {
+  const entry = allEntries.find(e => e.id === entryId);
+  if (!entry) return;
+
+  // Build a clean, readable plain-text block
+  const text = [
+    `BigQuery Release Notes — ${entry.title}`,
+    `Date: ${entry.formatted_date}`,
+    `Categories: ${entry.categories.join(', ') || 'N/A'}`,
+    ``,
+    entry.plain_text,
+    ``,
+    `Source: ${entry.link}`,
+  ].join('\n');
+
+  navigator.clipboard.writeText(text).then(() => {
+    const btn = document.getElementById(`copy-${idx}`);
+    if (btn) {
+      btn.classList.add('copied');
+      btn.innerHTML = `
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="20 6 9 17 4 12"></polyline>
+        </svg>
+        Copied!
+      `;
+      setTimeout(() => {
+        btn.classList.remove('copied');
+        btn.innerHTML = `
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+            <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+          </svg>
+          Copy
+        `;
+      }, 2000);
+    }
+    showToast('📋 Copied to clipboard!');
+  }).catch(() => {
+    showToast('⚠️ Could not access clipboard.');
+  });
+}
+
+/* =============================================
+   EXPORT TO CSV
+   ============================================= */
+function exportToCSV() {
+  // Export whichever entries are currently visible (respects active filter)
+  const visibleEntries = activeCategory === 'all'
+    ? allEntries
+    : allEntries.filter(e =>
+        e.categories.some(c => c.toLowerCase() === activeCategory.toLowerCase())
+      );
+
+  if (visibleEntries.length === 0) {
+    showToast('⚠️ No entries to export.');
+    return;
+  }
+
+  const headers = ['Date', 'Formatted Date', 'Categories', 'Summary', 'Docs URL'];
+
+  const rows = visibleEntries.map(e => [
+    e.updated,
+    e.formatted_date,
+    e.categories.join('; '),
+    e.plain_text,
+    e.link,
+  ]);
+
+  const csvContent = [headers, ...rows]
+    .map(row => row.map(field => `"${String(field ?? '').replace(/"/g, '""')}"`).join(','))
+    .join('\n');
+
+  const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement('a');
+  const filterLabel = activeCategory === 'all' ? 'all' : activeCategory.toLowerCase();
+  a.href     = url;
+  a.download = `bigquery-release-notes-${filterLabel}-${new Date().toISOString().slice(0,10)}.csv`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+
+  showToast(`✅ Exported ${visibleEntries.length} entries to CSV`);
+}
+
 function showToast(message) {
   const toast = document.getElementById('toast');
   toast.textContent = message;
