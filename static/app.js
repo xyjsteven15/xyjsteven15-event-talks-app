@@ -473,9 +473,36 @@ function escapeAttr(str) {
 }
 
 /* =============================================
+   THEME MANAGEMENT
+   ============================================= */
+function initTheme() {
+  const saved = localStorage.getItem('bq-theme');
+  // Default to dark; apply light only if explicitly saved
+  if (saved === 'light') {
+    document.documentElement.setAttribute('data-theme', 'light');
+    document.getElementById('themeToggle').checked = true;
+  }
+}
+
+function toggleTheme(checkbox) {
+  if (checkbox.checked) {
+    document.documentElement.setAttribute('data-theme', 'light');
+    localStorage.setItem('bq-theme', 'light');
+    showToast('☀️ Light mode on');
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+    localStorage.setItem('bq-theme', 'dark');
+    showToast('🌙 Dark mode on');
+  }
+}
+
+/* =============================================
    EVENT LISTENERS
    ============================================= */
 document.addEventListener('DOMContentLoaded', () => {
+  // Restore saved theme before first paint
+  initTheme();
+
   // Textarea live char count
   document.getElementById('tweetText').addEventListener('input', updateCharCount);
 
